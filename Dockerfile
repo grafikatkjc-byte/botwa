@@ -5,10 +5,17 @@
 #   - filesystem root read-only kecuali /tmp dan /data (jika Persistent Storage aktif)
 FROM node:20-bookworm-slim
 
-# Dependencies yang dibutuhkan sharp (libvips) dan untuk build native modules
+# Dependencies sistem:
+# - git: dibutuhkan npm untuk memasang paket yang mereferensikan git URL
+#        (beberapa dependensi Baileys menarik langsung dari repo git)
+# - libvips: backend untuk sharp (proses gambar saat bikin stiker)
+# - python3 + build-essential: jaga-jaga untuk native modules yang perlu compile
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
+      git \
       libvips \
+      python3 \
+      build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Folder aplikasi (owned oleh user 1000 — sesuai rekomendasi HF)
