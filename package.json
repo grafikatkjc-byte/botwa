@@ -1,0 +1,23 @@
+{
+  "name": "botwa-istimewa",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp grup istimewa berbasis Baileys",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["whatsapp", "bot", "baileys", "grup"],
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "express": "^4.21.1",
+    "pino": "^9.4.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.33.5",
+    "wa-sticker-formatter": "^4.4.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
