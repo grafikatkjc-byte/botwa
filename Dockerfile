@@ -1,41 +1,41 @@
 # Dockerfile untuk Hugging Face Spaces (Docker SDK)
-# HF Spaces:
-#   - container harus listen di port 7860
-#   - user default non-root (uid 1000)
-#   - filesystem root read-only kecuali /tmp dan /data (jika Persistent Storage aktif)
-FROM node:20-bookworm-slim
+# - Harus listen di port 7860
+# - User default uid 1000 (HF convention)
+# - Filesystem root read-only kecuali /tmp dan /data (Persistent Storage)
 
-# Dependencies sistem:
-# - git: dibutuhkan npm untuk memasang paket yang mereferensikan git URL
-#        (beberapa dependensi Baileys menarik langsung dari repo git)
-# - libvips: backend untuk sharp (proses gambar saat bikin stiker)
-# - python3 + build-essential: jaga-jaga untuk native modules yang perlu compile
+# Pakai image Node 20 full (bukan -slim). Image ini SUDAH TERMASUK git,
+# python3, dan build tools — menghindari error "spawn git ENOENT" saat
+# npm menarik dependency dari git URL (sub-deps Baileys seperti libsignal).
+FROM node:20-bookworm
+
+# Safety net: pastikan git & libvips tetap ada (untuk sharp/sticker).
+# Sekaligus upgrade npm ke versi terbaru agar resolver lebih pintar.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates \
       git \
       libvips \
-      python3 \
-      build-essential \
-    && rm -rf /var/lib/apt/lists/*
+      ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && git --version \
+    && npm install -g npm@latest
 
-# Folder aplikasi (owned oleh user 1000 — sesuai rekomendasi HF)
-RUN mkdir -p /app && chown -R 1000:1000 /app
+# HF Space wants uid 1000. Image 'node' sudah punya user 'node' (uid 1000).
 WORKDIR /app
+RUN chown -R node:node /app
 
-# Copy manifest dulu untuk cache layer install
-COPY --chown=1000:1000 package.json ./
-# Kalau ada lockfile, akan ikut ke-copy
-COPY --chown=1000:1000 package-lock.jso[n] ./
+USER node
 
-USER 1000
+# Copy manifest dulu (caching layer)
+COPY --chown=node:node package.json ./
+COPY --chown=node:node package-lock.jso[n] ./
 
-# Install dependencies produksi
-RUN npm install --omit=dev --no-audit --no-fund
+# Install dependencies produksi.
+# --unsafe-perm dihindari; user 'node' sudah punya HOME writable.
+RUN npm install --omit=dev --no-audit --no-fund --loglevel=error
 
 # Copy sisa source
-COPY --chown=1000:1000 . .
+COPY --chown=node:node . .
 
-# Fallback data dir kalau /data (persistent storage) tidak tersedia
+# Fallback data dir kalau /data (Persistent Storage) tidak ter-mount
 RUN mkdir -p /app/data
 
 ENV NODE_ENV=production \
