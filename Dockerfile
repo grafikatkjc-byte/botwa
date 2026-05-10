@@ -1,34 +1,50 @@
-# Dockerfile untuk Hugging Face Spaces (Docker SDK)
-# HF Spaces:
-#   - container harus listen di port 7860
-#   - user default non-root (uid 1000)
-#   - filesystem root read-only kecuali /tmp dan /data (jika Persistent Storage aktif)
-FROM node:20-bookworm-slim
+# Dockerfile untuk Hugging Face Spaces (Docker SDK) — VERSI v3
+# Kalau log HF menampilkan "BUILD v3" di bawah, artinya commit terbaru
+# sudah ter-deploy. Kalau tidak, Space masih pakai cache lama.
 
-# Dependencies yang dibutuhkan sharp (libvips) dan untuk build native modules
+FROM node:20-bookworm
+
+# Banner supaya jelas di log bahwa ini build dari Dockerfile terbaru
+RUN echo "===== BUILD v3 (non-slim, git bundled) =====" \
+ && which git \
+ && git --version \
+ && node --version \
+ && npm --version
+
+# Safety-net apt install. node:20-bookworm sudah punya git, tapi ini
+# memastikan versi terbaru dan menambahkan libvips untuk sharp.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates \
+      git \
       libvips \
-    && rm -rf /var/lib/apt/lists/*
+      ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && which git \
+ && echo "===== apt OK ====="
 
-# Folder aplikasi (owned oleh user 1000 — sesuai rekomendasi HF)
-RUN mkdir -p /app && chown -R 1000:1000 /app
+# Upgrade npm (diam-diam) supaya resolver git URL lebih stabil
+RUN npm install -g npm@latest --silent \
+ && npm --version \
+ && echo "===== npm upgraded ====="
+
 WORKDIR /app
+RUN chown -R node:node /app
 
-# Copy manifest dulu untuk cache layer install
-COPY --chown=1000:1000 package.json ./
-# Kalau ada lockfile, akan ikut ke-copy
-COPY --chown=1000:1000 package-lock.jso[n] ./
+USER node
 
-USER 1000
+# Verifikasi dari dalam user 'node' bahwa git masih accessible
+RUN which git && git --version
+
+# Copy manifest (caching layer)
+COPY --chown=node:node package.json ./
+COPY --chown=node:node package-lock.jso[n] ./
 
 # Install dependencies produksi
-RUN npm install --omit=dev --no-audit --no-fund
+RUN npm install --omit=dev --no-audit --no-fund --loglevel=error \
+ && echo "===== npm install OK ====="
 
 # Copy sisa source
-COPY --chown=1000:1000 . .
+COPY --chown=node:node . .
 
-# Fallback data dir kalau /data (persistent storage) tidak tersedia
 RUN mkdir -p /app/data
 
 ENV NODE_ENV=production \
